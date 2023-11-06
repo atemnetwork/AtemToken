@@ -2697,6 +2697,9 @@ contract AtemToken is ERC20, ERC20Burnable, AccessControl, ReentrancyGuard {
     // Authentication account for the post creation
     address private _platformAuthorizeAccount;
 
+    // Max supply of the token
+    uint256 public immutable maxSupply;
+
     // address of the vesting contract
     address public vestingContractAddress;
     TokenVesting private _vestingContract;
@@ -2714,7 +2717,8 @@ contract AtemToken is ERC20, ERC20Burnable, AccessControl, ReentrancyGuard {
         address initialPlatformAuthorizeAccount,
         bytes32 initialWhitelistRoot,
         uint256 initialWhitelistDepth,
-        uint256 chainId
+        uint256 chainId,
+        uint256 maxSupply_
     ) ERC20("AtemToken", "ATEM") {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(MINTER_ROLE, msg.sender);
@@ -2726,10 +2730,13 @@ contract AtemToken is ERC20, ERC20Burnable, AccessControl, ReentrancyGuard {
         whitelistRoot = initialWhitelistRoot;
         whitelistDepth = initialWhitelistDepth;
         chainId_ = chainId;
+
+        maxSupply = maxSupply_;
     }
 
     function mint(address to, uint256 amount) public onlyRole(MINTER_ROLE) {
         require(to != address(0), "AtemToken#mint: cannot mint to the zero address");
+        require(totalSupply() + amount <= maxSupply, "AtemToken#mint: exceeding max supply");
         _mint(to, amount);
     }
 
@@ -2744,6 +2751,8 @@ contract AtemToken is ERC20, ERC20Burnable, AccessControl, ReentrancyGuard {
     external nonReentrant()
     {
         address account = _msgSender();
+        require(amount > 0, "AtemToken#claimWithProof: amount must be greater than 0");
+        require(totalSupply() + amount <= maxSupply, "AtemToken#claimWithProof: exceeding max supply");
         require(_verify(_leaf(account, max_amount, user_type), proof), "AtemToken#claimWithProof: invalid merkle proof");
         require(amount + claimedNum[account] <= max_amount , "AtemToken#claimWithProof: exceeding your max claimable num");
         require(user_type < vestingSchedules.length, "AtemToken#claimWithProof: invalid user type");
@@ -2788,6 +2797,8 @@ contract AtemToken is ERC20, ERC20Burnable, AccessControl, ReentrancyGuard {
         bytes memory signature_
     ) external nonReentrant() {
         address account = _msgSender();
+        require(amount > 0, "AtemToken#claimWithSignature: amount must be greater than 0");
+        require(totalSupply() + amount <= maxSupply, "AtemToken#claimWithSignature: exceeding max supply");
 
         require(
                 _verifySig(
